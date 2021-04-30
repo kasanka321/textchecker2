@@ -1,0 +1,309 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="content-language" content="ja" />
+<title>My原稿チェック</title>
+<script type="text/javascript" src="./jquery.js"></script>
+<script src="./mark.min.js"></script>
+
+<!-- Copyright (c) 2014–2019 Julian Kühnel
+Released under the MIT license
+https://github.com/julmot/mark.js/blob/master/LICENSE -->
+
+<script type='text/javascript'>
+    let words_orginal = [["アスファルトフィニッシャ(?!ー)","アスファルトフィニッシャー"],["センタ(?!ー)","センター"]];
+    
+    console.log(JSON.stringify(words_orginal));
+
+		function doHighlight() {
+
+      // ハイライト対象のhtml要素を取得
+      var target = document.querySelector("#target");
+      var instance = new Mark(target);
+      // ハイライトを初期化
+      instance.unmark();
+      
+      // 色変更用の初期化
+      let i = 1;
+      let color_variation_on = false;
+      if($("[name=color_variation_on]:checked").val() == '1'){
+        color_variation_on = true;
+      }
+
+      // csvから、正誤の誤だけ抽出
+      var words = words_orginal.map(function (value) {
+        return value[0];
+      })
+
+      words.forEach(function(element){
+        if (!element) { return; } //空文字は飛ばす
+        
+        let reg = new RegExp(element,"gm");
+        // マッチした場合のみハイライト実行
+        if(target.innerHTML.match(reg)){
+          // 色変更
+          let color_num = String(i);
+          if(color_variation_on){
+            i = i + 1;
+            if(i > 12){ i = 1; }
+          }
+          // ハイライト実行
+          instance.markRegExp(reg, {"element": "mark" + color_num});
+        }
+      });
+
+      var html = document.getElementById("target").innerHTML ;
+      // csvの正誤を置換
+      words_orginal.forEach(function(element){
+        if(element[0]){
+          html = html.replace(new RegExp(element[0],"gm"),element[1]);
+        }
+      });
+      document.getElementById("target2").innerHTML = html;
+		}
+    
+
+
+    function csv2table(text) {
+      var rows = text.split("\n");
+      var table = document.createElement("table");
+      var tr_th = document.createElement("tr");
+      var th = document.createElement("th");
+      th.innerHTML = "誤";
+      var th2 = document.createElement("th");
+      th2.innerHTML = "正";
+      tr_th.appendChild(th);
+      tr_th.appendChild(th2);
+      table.appendChild(tr_th);
+
+      for ( var i = 0; i < rows.length; i++ ) {
+          var tr = document.createElement("tr");
+          var tds = rows[i].split("\t");
+          for ( var j = 0; j < tds.length; j++ ) {
+            var td = document.createElement("td");
+            td.innerHTML = tds[j];
+            tr.appendChild(td);
+          }
+          table.appendChild(tr);
+      }
+
+      return table;
+    }
+
+    function load_list(text) {
+      result = text.split("\r\n");
+      words_orginal = result.map(function (value) {
+        return value.split("\t");
+      })
+      //csvをテーブルにして追加
+      document.getElementById("load_test").innerHTML = "";
+      let tables = csv2table(text);
+      document.getElementById("load_test").appendChild(tables);
+    }
+
+
+    // ファイルドラッグ関連の処理
+    // https://www.techscore.com/blog/2012/11/12/html5-%E3%81%AE-file-api-%E3%81%A7%E3%83%89%E3%83%A9%E3%83%83%E3%82%B0%EF%BC%86%E3%83%89%E3%83%AD%E3%83%83%E3%83%97%E3%81%99%E3%82%8B/
+    $(function() {
+    // ドラッグ中の色変える
+      $('#droppable').bind('dragover', onDragOver);
+      function onDragOver(e) {
+        e.preventDefault();
+        $('#droppable').removeClass("noneactive");
+        $('#droppable').addClass("active");
+      }
+      $('#droppable').bind('dragleave drop', onDragLeave);
+      function onDragLeave(e) {
+        e.preventDefault();
+        $('#droppable').removeClass("active");
+        $('#droppable').addClass("noneactive");
+      }
+
+      var droppable = $("#droppable");
+
+      // File API が使用できない場合は諦めます.
+      if(!window.FileReader) {
+        alert("File API がサポートされていません。");
+        return false;
+      }
+
+      // イベントをキャンセルするハンドラです.
+      var cancelEvent = function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          return false;
+      }
+
+      // dragenter, dragover イベントのデフォルト処理をキャンセルします.
+      droppable.bind("dragenter", cancelEvent);
+      droppable.bind("dragover", cancelEvent);
+
+      // ドロップ時のイベントハンドラを設定します.
+      var handleDroppedFile = function(event) {
+        // ファイルは複数ドロップされる可能性がありますが, ここでは 1 つ目のファイルを扱います.
+        var file = event.originalEvent.dataTransfer.files[0];
+
+        // ファイルの内容は FileReader で読み込みます.
+        var fileReader = new FileReader();
+        fileReader.onload = function(event) {
+          // event.target.result に読み込んだファイルの内容が入っています.
+          // ドラッグ＆ドロップでファイルアップロードする場合は result の内容を Ajax でサーバに送信しましょう!
+          $("#droppable").html("新規ファイルを読み込みました<br>[" + file.name + "]<br><br>★ここに正誤ファイルをドロップ★<br>↑サンプルファイルを改変して<br>　ドロップしてください。<br>　※タブ区切り形式、UTF-8のみ、正規表現可<br><br>");
+          // $("#droppable").text("[" + file.name + "]");
+          load_list(event.target.result);
+          // localStorage にデータを保存
+          localStorage.setItem('filename', file.name);          
+          localStorage.setItem('text', event.target.result);          
+        }
+        fileReader.readAsText(file);
+
+        // デフォルトの処理をキャンセルします.
+        cancelEvent(event);
+        return false;
+      }
+
+      // ドロップ時のイベントハンドラを設定します.
+      droppable.bind("drop", handleDroppedFile);
+    });
+
+    window.onload = function(){
+      // localStorage に保存したデータを取得
+      let filename = localStorage.getItem('filename');
+      let text = localStorage.getItem('text');
+      if(filename){
+        $("#droppable").html("保存ファイルを読み込みました<br>[" + filename + "]<br><br>★ここに正誤ファイルをドロップ★<br>↑サンプルファイルを改変して<br>　ドロップしてください。<br>　※タブ区切り形式、UTF-8のみ、正規表現可<br><br>");
+        load_list(text);
+      }
+    }
+
+</script>
+<style type="text/css">
+    table td {
+      background: #eaf6ff;
+    }
+    table tr:nth-child(odd) td {
+      background: #fff;
+    }
+
+    mark1{
+			background-color:yellow;
+    }
+    mark2{
+			background-color:#e2b2c0;
+    }
+    mark3{
+			background-color:#addaff;
+    }
+    mark4{
+			background-color:#e4ad6d;
+    }
+    mark5{
+			background-color:#f768b4;
+    }
+    mark6{
+			background-color:#dbe159;
+    }
+    mark7{
+			background-color:#7fefca;
+    }
+    mark8{
+			background-color:#f1aaff;
+    }
+    mark9{
+			background-color:#eabf4c;
+    }
+    mark10{
+			background-color:#f9e697;
+    }
+    mark11{
+			background-color:#b3d3ac;
+    }
+    mark12{
+			background-color:#eac7cd;
+    }
+
+    /* カーソルの変更 */
+    /* https://qiita.com/7note/items/3c7829c1e25eea67a1e6 */
+    #target,#target2 {
+      caret-color: red;   /* デフォルトの点滅カーソルを非表示 */
+      border: 1px solid #000;     /* textarea風に枠線を付ける */
+      border-radius: 3px;         /* textarea風に角丸を付ける */
+      margin: 4px;
+      padding: 2px 5px;           /* textarea風に余白を付ける */
+      font-size:16px;
+      width:40%;
+    }
+
+    #text1,#text2 {
+      margin: 4px;
+      padding: 2px 5px;           /* textarea風に余白を付ける */
+      font-size:16px;
+      width:40%;
+    }
+
+    /* 並列にしたい親要素にflexを指定すると、横並びにできる */
+    #flex,#flex_text,#flex_upload {
+      display: flex;
+    }
+
+    /* ドラッグ中の色変えcss */
+    .noneactive {
+      border: gray solid 0.4em;
+    }    
+    .active {
+      border:  0.4em dotted orange;
+    }
+
+    /* テーブルのcss */
+    th,td {
+      border: solid 1px;              /* 枠線指定 */
+    }
+    table {
+        border-collapse:  collapse;     /* セルの線を重ねる */
+    }
+    summary {
+      width:350px;
+      cursor: pointer;
+      background-color:#c6dfff;
+
+    }
+
+</style>
+
+<body>
+<h2>My原稿チェッカー（β版）</h2>
+<h3>正誤表読込</h3>
+<details open>
+  <summary><b>※正誤ファイル読込（開閉可能）</b><A href="sample.txt" download="sample.txt">サンプル</A></summary>
+  <div id ="flex_upload">
+    <div id ="load_test">
+    </div>  　　
+    <div id="droppable" class="noneactive">
+      ★ここに正誤ファイルをドロップ★<br>↑サンプルファイルを改変して<br>　ドロップしてください。<br>　※タブ区切り形式、UTF-8のみ、正規表現可<br>
+    </div>
+  </div>
+</details>
+
+
+<br>
+<input type="button" onclick="doHighlight()" value="怪しい表現をハイライト">
+　　<input type="checkbox" checked="checked" name="color_variation_on" value="1" style="transform:scale(1.5);">色を検索語ごとに変える(12色まで)<br>
+  <div id ="flex_text">
+    <div id="text1">★元原稿</div>
+    <div id="text2">★チェック後</div>
+  </div>
+
+  <div id ="flex">
+    <div id="target" contenteditable="true">
+      　わがはいは猫である。名前はまだ無い。<br>
+      　どこで生れたかとんとけんとうがつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。吾輩はここで始めて人間というものを見た。しかもあとで聞くとそれは書生という人間中で一番どうあくな種族であったそうだ。この書生というのは時々我々を捕えて煮て食うという話である。しかしその当時は何という考もなかったから別段恐しいとも思わなかった。ただ彼のてのひらに載せられてスーと持ち上げられた時何だかフワフワした感じがあったばかりである。掌の上で少し落ちついて書生の顔を見たのがいわゆる人間というものの見始であろう。この時妙なものだと思った感じが今でも残っている。第一毛をもって装飾されべきはずの顔がつるつるしてまるでやかんだ。その後猫にもだいぶ逢ったがこんなかたわには一度も出会わした事がない。のみならず顔の真中があまりに突起している。そうしてその穴の中から時々ぷうぷうと煙を吹く。どうも咽せぽくて実に弱った。これが人間の飲むたばこというものである事はようやくこの頃知った。<br>    
+    </div>
+    <div id="target2" contenteditable="true">
+
+    </div>  
+  </div>
+
+</body>
+</html>
+
